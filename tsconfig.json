@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "rootDir": "src",
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "removeComments": true,/* Disable emitting comments. */
+    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
+  },
+    "include": ["./src/**/**/*", "server.ts","test.js"]
+
+}
