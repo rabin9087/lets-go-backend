@@ -1,5 +1,5 @@
 import { Schema, model, Document, Types } from "mongoose";
-import { boolean } from "zod";
+import { boolean, string } from "zod";
 
 export interface ICoordinates {
   latitude: number;
@@ -12,23 +12,35 @@ export interface IDriverRide extends Document {
   vehicle: {
     rego: string;
   };
-  currentLocation: ICoordinates;
-  destination?: ICoordinates;
+  currentLocation: {address: string, coords: ICoordinates};
+  destination?: {address: string, coords: ICoordinates};
   polyline: ICoordinates[];
   isOnline: boolean;
+  seatAvailable?: Number;
   status: "online" | "on-trip" | "offline";
   socketId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const CoordinatesSchema = new Schema<ICoordinates>(
+const CoordsSchema = new Schema(
   {
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true },
   },
-  { _id: false }
+  { _id: false } // disable _id for nested object
 );
+
+/* ---------------- COORDINATES SCHEMA ---------------- */
+const CoordinatesSchema = new Schema(
+  {
+    address: { type: String }, // optional
+    coords: { type: CoordsSchema, required: true },
+  },
+  { _id: false } // disable _id for parent embedded document
+);
+
+
 
 const DriverRideSchema = new Schema<IDriverRide>(
   {
@@ -41,11 +53,13 @@ const DriverRideSchema = new Schema<IDriverRide>(
     currentLocation: {
       type: CoordinatesSchema,
       required: true,
+      indexes: true
     },
 
     destination: {
       type: CoordinatesSchema,
       required: false,
+      indexes: true
     },
 
     polyline: {
@@ -55,6 +69,12 @@ const DriverRideSchema = new Schema<IDriverRide>(
     isOnline: {
       type: Boolean,
       default: false,
+      indexes: true
+    },
+    seatAvailable: {
+      type: Number,
+      required: true,
+      default: 4
     },
     status: {
       type: String,

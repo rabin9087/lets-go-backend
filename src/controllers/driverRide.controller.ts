@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { createNewDriverRide, findDriverId, getAllDrivers, getDriversByLocation } from "../schema/driver/driverRide.models";
+import { createNewDriverRide, findAndUpdateDriverRideOnlineStatus, getAllDrivers, getDriversByLocation } from "../schema/driver/driverRide.models";
 import { ICoordinates, IDriverRide } from "../schema/driver/driverRide.schema";
 import { getUserByPhoneOrEmail, updateDriverOnlineStatus } from "../schema/users/user.model";
 
@@ -9,17 +9,15 @@ export const updateDriverOnlineStatusController = async (
   next: NextFunction
 ) => {
   try {
-    const {email_phone, onlineStatus, currentLocation, destination, rego  } = req.body;
+    const { email_phone, onlineStatus, currentLocation, destination, rego, seatAvailable } = req.body;
+
     if (onlineStatus === undefined) {
       return res.status(400).json({
         status: "error",
-        message: "Missing required fields ( onlineStatus)",
+        message: "Missing required field (onlineStatus)",
       });
     }
-      
-    //   const user = req.userInfo
 
-    // Step 1: Find user once (no duplicate DB calls)
     const user = await getUserByPhoneOrEmail(email_phone);
 
     if (!user) {
@@ -28,53 +26,49 @@ export const updateDriverOnlineStatusController = async (
         message: "User not found",
       });
     }
-       if (user?.role !== "driver") {
-      return res.status(404).json({
+
+    if (user.role !== "driver") {
+      return res.status(403).json({
         status: "error",
-        message: "You are not Allowed to go Online",
+        message: "You are not allowed to go online",
       });
     }
 
-      if (!user.driverProfile?.isApproved) {
-        await updateDriverOnlineStatus(
-      user?.phone,
-      false
-    );
+    if (!user.driverProfile?.isApproved) {
+      await updateDriverOnlineStatus(user.phone, false);
       return res.status(403).json({
         status: "error",
         message: "Driver is not approved, please contact admin",
       });
     }
-      delete (user.password)
-      
-    // Step 2: Update status using user._id (email_phone is wrong)
-    const updatedRide = await updateDriverOnlineStatus(
-      user?.phone,
-      onlineStatus
-      );
-      if (onlineStatus) {  
-          await createNewDriverRide({ driverId: user._id, currentLocation, destination, vehicle: { rego }, isOnline: onlineStatus, status: "online" } as IDriverRide)
-          return res.status(200).json({
-        status: "success",
-        message: "Driver is online",
-        data: {
-            updatedRide,
-            onlineStatus: user.driverProfile.isOnline
-},
+
+    // ✅ Update driver profile online status
+    await updateDriverOnlineStatus(user.phone, onlineStatus);
+
+    // ✅ Update or create driver ride
+      const ride = await findAndUpdateDriverRideOnlineStatus({
+      driverId: user._id,
+      isOnline: onlineStatus,
+      status: onlineStatus ? "online" : "offline",
+      currentLocation,
+      destination,
+      rego,
+      seatAvailable
     });
-}
+
     return res.status(200).json({
       status: "success",
-      message: "Driver id OffLine",
-        data: {
-            updatedRide,
-            onlineStatus: user.driverProfile.isOnline
-        },
+      message: `Driver is ${onlineStatus ? "Online" : "Offline"}`,
+      data: {
+        onlineStatus,
+        ride,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 export const updateDriverCurrentLocationController = async (
   req: Request,
@@ -82,7 +76,7 @@ export const updateDriverCurrentLocationController = async (
   next: NextFunction
 ) => {
   try {
-    const { email_phone, onlineStatus, currentLocation, destination, polyline, rego  } = req.body;
+    const { email_phone, onlineStatus, currentLocation, destination, polyline, rego, seatAvailable  } = req.body;
 
     if (!email_phone || onlineStatus === undefined) {
       return res.status(400).json({
@@ -124,8 +118,7 @@ export const updateDriverCurrentLocationController = async (
       onlineStatus
       );
  
-    const driver =  await findDriverId({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline"})
-      if(!driver?._id) await createNewDriverRide({driverId: user?._id, currentLocation, destination, polyline, vehicle:{ rego},  status: "online" } as IDriverRide)
+    const driver =  await findAndUpdateDriverRideOnlineStatus({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline", seatAvailable})
 
     return res.status(200).json({
       status: "success",

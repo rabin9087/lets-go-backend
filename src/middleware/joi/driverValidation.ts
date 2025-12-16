@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { BOOLEANREQUIRED, COORDINATEREQUIRED, JoiValidationProcess, SORTSTRREQUIRED } from './joiValidation';
+import { BOOLEANREQUIRED, COORDINATEREQUIRED, JoiValidationProcess, NUMBERREQUIRED, SORTSTRREQUIRED } from './joiValidation';
 
 export const driverOnlineStatusValidation = (
     req: Request,
@@ -11,7 +11,8 @@ export const driverOnlineStatusValidation = (
         currentLocation: COORDINATEREQUIRED,
         destination: COORDINATEREQUIRED,
         email_phone: SORTSTRREQUIRED,
-        rego: SORTSTRREQUIRED         
+        rego: SORTSTRREQUIRED,
+        seatAvailable: NUMBERREQUIRED
     };
     return JoiValidationProcess({ schemaObj, req, res, next });
 }

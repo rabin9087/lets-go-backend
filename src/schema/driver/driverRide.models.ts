@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import driverRideSchema, { ICoordinates, IDriverRide } from "./driverRide.schema"
 
 // const { lat, lng } = currentLocation;
@@ -53,6 +54,28 @@ export const getADriverByRegoPhone = (regoPhone: string) => {
   return driverRideSchema.findOne({$or: [{ "vehicle.rego": regoPhone }, { phone: regoPhone }]})
 }
 
-export const findDriverId = ({driverId, isOnline, status}: {driverId: object, isOnline: boolean, status: string}) => {
-  return driverRideSchema.findOneAndUpdate({driverId}, {isOnline, status})
-}
+export const findAndUpdateDriverRideOnlineStatus = ({
+  driverId,
+  isOnline,
+  status,
+  currentLocation,
+  destination,
+  rego,
+  seatAvailable
+}: {
+  driverId: mongoose.Types.ObjectId;
+  isOnline: boolean;
+  status: string;
+  currentLocation?: any;
+  destination?: any;
+    rego?: string;
+    seatAvailable: Number;
+}) => {
+  return driverRideSchema.findOneAndUpdate(
+    { driverId },                // find by driverId
+    {
+      isOnline, status, currentLocation, destination, vehicle: rego ? { rego } : undefined, seatAvailable },        // update fields
+    { new: true, upsert: true }  // create if not exists
+  );
+};
+
