@@ -1,9 +1,11 @@
 import { Schema, model, Document, Types } from "mongoose";
-import { boolean, string } from "zod";
+import { CoordinatesSchema, GeoPointSchema, IGeoPoint, ILocation } from "../common schema/shareSchema.schema";
 
-export interface ICoordinates {
-  latitude: number;
-  longitude: number;
+/* ---------------- TYPES ---------------- */
+
+export interface IGeoLineString {
+  type: "LineString";
+  coordinates: [number, number][];
 }
 
 export interface IDriverRide extends Document {
@@ -12,79 +14,100 @@ export interface IDriverRide extends Document {
   vehicle: {
     rego: string;
   };
-  currentLocation: {address: string, coords: ICoordinates};
-  destination?: {address: string, coords: ICoordinates};
-  polyline: ICoordinates[];
+  // 🔹 Old structure (keep for UI & compatibility)
+  currentLocation: ILocation;
+  // 🔥 NEW (for geo queries)
+  currentLocationGeo: IGeoPoint;
+  destination?: ILocation;
+  destinationLocationGeo: IGeoPoint;
+  routeGeo: IGeoLineString;
   isOnline: boolean;
-  seatAvailable?: Number;
+  seatAvailable?: number;
   status: "online" | "on-trip" | "offline";
   socketId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const CoordsSchema = new Schema(
-  {
-    latitude: { type: Number, required: true },
-    longitude: { type: Number, required: true },
-  },
-  { _id: false } // disable _id for nested object
-);
-
-/* ---------------- COORDINATES SCHEMA ---------------- */
-const CoordinatesSchema = new Schema(
-  {
-    address: { type: String }, // optional
-    coords: { type: CoordsSchema, required: true },
-  },
-  { _id: false } // disable _id for parent embedded document
-);
-
-
+/* ---------------- DRIVER RIDE SCHEMA ---------------- */
 
 const DriverRideSchema = new Schema<IDriverRide>(
   {
-    driverId: { type: Schema.Types.ObjectId, ref: "User", required: true, indexes: 1 },
-    phone: {type: String, indexes: 1},
+    driverId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    phone: { type: String, index: true },
+
     vehicle: {
-        rego: { type: String, indexes: 1},
+      rego: { type: String, index: true },
     },
 
     currentLocation: {
       type: CoordinatesSchema,
       required: true,
-      indexes: true
+    },
+
+    currentLocationGeo: {
+      type: GeoPointSchema,
+      required: true,
+      index: "2dsphere",
     },
 
     destination: {
       type: CoordinatesSchema,
-      required: false,
-      indexes: true
     },
 
-    polyline: {
-      type: [CoordinatesSchema],
-      default: [],
+    destinationLocationGeo: {
+      type: GeoPointSchema,
+      required: true,
+      index: "2dsphere",
     },
+
+    // ✅ Update routeGeo to be proper LineString GeoJSON
+    routeGeo: {
+      type: {
+        type: String,
+        enum: ["LineString"],
+        required: true,
+        default: "LineString",
+      },
+      coordinates: {
+        type: [[Number]], // Array of [lng, lat]
+        required: true,
+        default: [],
+      },
+    },
+
     isOnline: {
       type: Boolean,
       default: false,
-      indexes: true
+      index: true,
     },
+
     seatAvailable: {
       type: Number,
-      required: true,
-      default: 4
+      default: 4,
     },
+
     status: {
       type: String,
       enum: ["online", "on-trip", "offline"],
       default: "offline",
     },
-    socketId: { type: String },
 
+    socketId: { type: String },
   },
   { timestamps: true }
 );
 
+// ✅ Create 2dsphere indexes for geospatial queries
+DriverRideSchema.index({ currentLocationGeo: "2dsphere" });
+DriverRideSchema.index({ destinationLocationGeo: "2dsphere" });
+DriverRideSchema.index({ routeGeo: "2dsphere" });
+
 export default model<IDriverRide>("Driver", DriverRideSchema);
+

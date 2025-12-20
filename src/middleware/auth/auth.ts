@@ -377,8 +377,9 @@ export const refreshAuth = async (req: Request, res: Response, next: NextFunctio
         return res.json({
           status: "success",
           message: "Authorized",
-          accessJWT,
-          user,
+          data: {
+          user, accessJWT
+          }
         });
       }
     }

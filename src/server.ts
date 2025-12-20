@@ -13,6 +13,7 @@ import { Server } from "socket.io";
 import router from "./routes/index.router";
 import { CustomError } from "./types";
 import morgan from "morgan";
+import { initSocket } from "./utils/socket.io";
 
 dotenv.config();
 connectDB();
@@ -47,14 +48,15 @@ app.use(
 
 // Socket.IO server
 const httpServer = createServer(app);
-export const onlineDrivers: Record<string, string> = {};
-export const onlineRiders: Record<string, string> = {};
-export const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+initSocket(httpServer)
+// export const onlineDrivers: Record<string, string> = {};
+// export const onlineRiders: Record<string, string> = {};
+// export const io = new Server(httpServer, {
+//   cors: {
+//     origin: "*",
+//     // methods: ["GET", "POST"]
+//   }
+// });
 
 // Start
 httpServer.listen(PORT, () => console.log(`Server running on ${PORT}`));

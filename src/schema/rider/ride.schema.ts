@@ -1,11 +1,18 @@
 import mongoose, { Document } from "mongoose";
+import { ICoordinates, IGeoPoint, ILocation } from "../common schema/shareSchema.schema";
+
+
 
 export interface IRide extends Document {
   riderId: mongoose.Types.ObjectId;
   driverId?: mongoose.Types.ObjectId;
-  pickupLocation: { lat: number; lng: number; address?: string };
-  dropoffLocation: { lat: number; lng: number; address?: string };
-  distance?: number;
+  pickupLocation: ILocation;
+  // pickupLocationGeo: IGeoPoint;
+  dropoffLocation: ILocation;
+  // dropupLocationGeo: IGeoPoint;
+  distance?: string;
+  duration: string;
+  people?: number;
   price?: number;
   status: string;
   paymentStatus: string;
@@ -16,13 +23,23 @@ export interface IRide extends Document {
 const RideSchema = new mongoose.Schema<IRide>({
   riderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, indexes: true },
   driverId: { type: mongoose.Schema.Types.ObjectId, ref: "User", indexes: true },
-  pickupLocation: { lat: Number, lng: Number, address: String },
-  dropoffLocation: { lat: Number, lng: Number, address: String },
-  distance: Number,
+  pickupLocation: {
+    coords: {
+      latitude: { type: Number },
+      longitude: {type: Number}},
+      address: String
+  },
+  dropoffLocation: { coords: {
+      latitude: { type: Number },
+      longitude: {type: Number}},
+      address: String },
+  distance: String,
+  duration: String,
   price: Number,
-  status: { type: String, enum:["requested", "ontrip", "cancelled", "completed"], default: "requested" },
+  people: {type: Number},
+  status: { type: String, enum:["requested", "ontrip", "cancelled", "completed", "accepted"], default: "requested" },
   paymentStatus: { type: String, default: "pending" },
-  startedAt: Date,
+  startedAt: {type: Date, default: new Date},
   completedAt: Date,
 }, { timestamps: true });
 

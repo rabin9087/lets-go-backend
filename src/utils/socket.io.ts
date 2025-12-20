@@ -1,41 +1,42 @@
-// simple in-memory mapping of rideId -> set of sockets (for demo)
+import { Server } from "socket.io";
+import http from "http";
+import driverRideSchema from "../schema/driver/driverRide.schema";
 
-import { updateOnlineDriverSocketId } from "../schema/driver/driverRide.models";
-import { io, onlineDrivers } from "../server";
+let io: Server;
 
-// in production use proper rooms (socket.io rooms below handle this)
-io.on('connection', (socket) => {
-  console.log('socket connected', socket.id);
-
-  //driver socket
-  socket.on('online-driver', ({ driverId }) => {
-    onlineDrivers[driverId] = socket.id
-    updateOnlineDriverSocketId({driverId, socketId: onlineDrivers[driverId]})
+export const initSocket = (server: http.Server) => {
+  io = new Server(server, {
+    cors: {
+      origin: "*",
+    },
   });
 
-   // Receive driver location Updates
-  socket.on("driver-location", ({ driverId, lat, lng }) => {
-    console.log("📍 Driver location update:", driverId, lat, lng);
+  io.on("connection", (socket) => {
+    console.log("✅ Socket connected:", socket.id);
 
-    // Broadcast to everyone or specific rider
-    io.emit(`driver:${driverId}:location`, { lat, lng });
-  });
- 
-  // join a ride room (passenger or driver): { rideId }
-  socket.on('joinRide', ({ rideId }) => {
-    socket.join(rideId);
-    console.log(`${socket.id} joined ride ${rideId}`);
-  });
+    socket.on("online-driver", async ({ driverId }) => {
+      console.log("🚗 Driver online:", driverId);
 
+      await driverRideSchema.findOneAndUpdate(
+        { driverId },
+        { socketId: socket.id }
+      );
+    });
 
-  // driver sends location updates: { rideId, lat, lng, bearing, speed }
-  socket.on('driverLocation', (payload) => {
-    const { rideId } = payload;
-    // broadcast to all passengers in ride room (except sender)
-    socket.to(rideId).emit('driverLocation', payload);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('socket disconnected', socket.id);
-  });
+    socket.on("disconnect", async () => {
+    await driverRideSchema.findOneAndUpdate(
+    { socketId: socket.id },
+    { socketId: null }
+  );
 });
+  });
+
+  return io;
+};
+
+export const getIO = () => {
+  if (!io) {
+    throw new Error("Socket.io not initialized");
+  }
+  return io;
+};

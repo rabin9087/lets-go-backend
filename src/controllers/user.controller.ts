@@ -84,6 +84,7 @@ export const loginUser = async (
     // todo send jwt tokens to the user
     // Remove fields based on role
     delete user.password;
+    delete user.refreshJWT;
     if (user.role === "rider") delete user.driverProfile;
     if (user.role === "driver") delete user.riderProfile;
           

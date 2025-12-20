@@ -1,5 +1,5 @@
 import mongoose, { Document } from "mongoose";
-import { ICoordinates } from "../driver/driverRide.schema";
+import { ICoordinates } from "../common schema/shareSchema.schema";
 
 export interface IUser extends Document {
   name: string;

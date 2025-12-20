@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { createNewDriverRide, findAndUpdateDriverRideOnlineStatus, getAllDrivers, getDriversByLocation } from "../schema/driver/driverRide.models";
-import { ICoordinates, IDriverRide } from "../schema/driver/driverRide.schema";
+import { createNewDriverRide, findAndUpdateDriverRideOnlineStatus, getAllDrivers } from "../schema/driver/driverRide.models";
 import { getUserByPhoneOrEmail, updateDriverOnlineStatus } from "../schema/users/user.model";
 
 export const updateDriverOnlineStatusController = async (
@@ -9,7 +8,7 @@ export const updateDriverOnlineStatusController = async (
   next: NextFunction
 ) => {
   try {
-    const { email_phone, onlineStatus, currentLocation, destination, rego, seatAvailable } = req.body;
+    const { email_phone, onlineStatus, currentLocation, destination, rego, seatAvailable, routeGeo } = req.body;
 
     if (onlineStatus === undefined) {
       return res.status(400).json({
@@ -53,7 +52,8 @@ export const updateDriverOnlineStatusController = async (
       currentLocation,
       destination,
       rego,
-      seatAvailable
+      seatAvailable,
+        routeGeo
     });
 
     return res.status(200).json({
@@ -69,14 +69,13 @@ export const updateDriverOnlineStatusController = async (
   }
 };
 
-
 export const updateDriverCurrentLocationController = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { email_phone, onlineStatus, currentLocation, destination, polyline, rego, seatAvailable  } = req.body;
+    const { email_phone, onlineStatus, currentLocation, destination, routeGeo, rego, seatAvailable  } = req.body;
 
     if (!email_phone || onlineStatus === undefined) {
       return res.status(400).json({
@@ -118,7 +117,7 @@ export const updateDriverCurrentLocationController = async (
       onlineStatus
       );
  
-    const driver =  await findAndUpdateDriverRideOnlineStatus({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline", seatAvailable})
+    const driver =  await findAndUpdateDriverRideOnlineStatus({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline", seatAvailable, routeGeo})
 
     return res.status(200).json({
       status: "success",
