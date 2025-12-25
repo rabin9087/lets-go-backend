@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import userSchema, { IUser } from "./user.schema";
 
 export const createUser = (userObj: IUser) => {
@@ -14,7 +15,7 @@ export const getAllUser = () => {
 
 export const getUserByPhoneOrEmail = async (email_phone: string) => {
   return await userSchema
-    .findOne({ $or: [{ email: email_phone }, { phone: email_phone }] })
+    .findOne({ $or: [{ email: email_phone }, { phone: email_phone }] }).populate("currentTrip")
 };
 
 export const UpdateUserByPhone = (phone: string, data: { refreshJWT?: string } & Record<string, any>) => {
@@ -70,7 +71,7 @@ export const getUserByPhoneAndJWT = async ({
   return userSchema.findOne({
     phone,
     refreshJWT, // Check if refreshJWT exists in the array
-  })
+  }).populate("currentTrip")
     // .populate("cartHistory.items.productId"); // Path to populate cartHistory items;
 };
 
@@ -91,4 +92,24 @@ export const updateDriverOnlineStatus = async (
     },
     { new: true }
   ).select({_id: 1, "driverProfile.isOnline": 1});
+};
+
+export const addNewTripToUser = async ({_id, currentTrip }: {_id: mongoose.Types.ObjectId, currentTrip: mongoose.Types.ObjectId | null}) => {
+  const update: any = {
+    $set: { currentTrip },
+  };
+
+  // ✅ Only push if currentTrip is NOT null
+  if (currentTrip) {
+    update.$push = {
+      trips: {
+        $each: [currentTrip],
+        $position: 0, // 👈 push at FIRST position
+      },
+    };
+  }
+
+  return await userSchema.findByIdAndUpdate(_id, update, {
+    new: true,
+  });
 };

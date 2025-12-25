@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { insertNewRide } from '../schema/rider/ride.models';
 import { getALlOnlineDriversController, updateDriverCurrentLocationController, updateDriverOnlineStatusController } from '../controllers/driverRide.controller';
 import { driverAccess } from '../middleware/auth/auth';
 import { driverOnlineStatusValidation } from '../middleware/joi/driverValidation';

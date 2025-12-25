@@ -25,6 +25,9 @@ export interface IUser extends Document {
     bankDetails?: any;
     identityDocs?: any;
   };
+  currentTrip: mongoose.Types.ObjectId | null;
+  trips: mongoose.Types.ObjectId[];
+
 }
 
 const UserSchema = new mongoose.Schema<IUser>({
@@ -60,6 +63,18 @@ const UserSchema = new mongoose.Schema<IUser>({
     identityDocs: { licenseFront: String, licenseBack: String, insurance: String },
     bankDetails: { bankName: String, accountNumber: String, holderName: String },
   },
+  currentTrip: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Trip",
+    default: null,
+},
+
+  trips: [
+      {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Trip",
+      }
+  ],
 }, { timestamps: true });
 
 export default mongoose.model<IUser>("User", UserSchema);

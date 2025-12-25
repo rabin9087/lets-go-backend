@@ -2,10 +2,6 @@ import mongoose from "mongoose";
 import driverRideSchema, { IDriverRide } from "./driverRide.schema"
 import { ICoordinates, ILocation } from "../common schema/shareSchema.schema";
 
-// const { lat, lng } = currentLocation;
-// const deltaLat = 200 / 111000; 
-// const deltaLng = 200 / (111000 * Math.cos(lat * (Math.PI / 180)));
-
 export const createNewDriverRide = (driverRide: IDriverRide) => {
     return new driverRideSchema(driverRide).save()
 }
@@ -21,7 +17,6 @@ export const getAllDrivers = async ({
     isOnline: true, status: "online"
   });
 };
-
 
 export const getDriversByPickUpAndDropoffLocation = async ({
   pickupLocation,
@@ -105,7 +100,6 @@ export const getDriversByPickupLocation = async ({
   }).sort({ createdAt: 1 });
 };
 
-
 export const findAndUpdateDriverRideOnlineStatus = async ({
   driverId,
   isOnline,
@@ -178,3 +172,26 @@ if (routeGeo?.length) {
     { new: true }
   );
 };
+
+export const updateDriverTripStatus = async ({
+  driverId,
+  status,
+  seats, // number of seats to subtract
+}: {
+  driverId: mongoose.Types.ObjectId;
+  status: string;
+  seats: number;
+}) => {
+  return driverRideSchema.findOneAndUpdate(
+    { driverId, seatAvailable: { $gte: seats } }, // only update if enough seats
+    {
+      $set: { status },            // update status
+      $inc: { seatAvailable: - ( seats as number)}, // subtract seats
+    },
+    { new: true } // return updated document
+  );
+};
+
+export const getADriverByDriverId = async(driverId: mongoose.Types.ObjectId) => {
+  return await driverRideSchema.findOne({driverId})
+}

@@ -5,6 +5,7 @@ import { IUser } from "../../schema/users/user.schema";
 import { createAccessJWT, verifyAccessJWT, verifyRefreshJWT } from "../../utils/jwt";
 import { getAllUser, getUserByPhoneAndJWT, getUserByPhoneOrEmail } from "../../schema/users/user.model";
 import { CheckUserByToken, findOneByFilterAndDelete } from "../../schema/session/session.model";
+import { getADriverByDriverId } from "../../schema/driver/driverRide.models";
 
 type UserWithoutSensitiveData = Omit<IUser, 'password' | 'refreshJWT'>;
 
@@ -325,7 +326,6 @@ export const refreshAuth = async (req: Request, res: Response, next: NextFunctio
   try {
     // 1. Get the refreshAuth token
     const { authorization } = req.headers;
-    console.log(authorization)
     if (!authorization) {
       return res.status(401).json({ status: "error", message: "No Authorization provided" });
     }
@@ -347,7 +347,9 @@ export const refreshAuth = async (req: Request, res: Response, next: NextFunctio
             return res.json({
               status: "success",
               message: "Authorized",
-              user,
+              data: {
+              user
+          }
             });
           }
         }
@@ -367,18 +369,26 @@ export const refreshAuth = async (req: Request, res: Response, next: NextFunctio
       });
 
       if (user?._id) {
-        user.password = undefined; // Remove password before sending response
+        user.password = undefined;
+        
+        // Remove password before sending response
         // user.cartHistory = undefined; // Remove password before sending response
         // 5. Generate a new access JWT
         const accessJWT = await createAccessJWT({email: user.email  as string, phone: user.phone, role: user.role});
         user.refreshJWT = token
         req.userInfo = user
+        let driver
+        if (user?.role === "driver") {
+            driver = await getADriverByDriverId(user._id)
+        }
+
+       
         
         return res.json({
           status: "success",
           message: "Authorized",
           data: {
-          user, accessJWT
+          user, accessJWT, driver
           }
         });
       }

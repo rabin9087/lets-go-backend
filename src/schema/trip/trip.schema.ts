@@ -3,13 +3,13 @@ import { ICoordinates, IGeoPoint, ILocation } from "../common schema/shareSchema
 
 
 
-export interface IRide extends Document {
+export interface ITrip extends Document {
   riderId: mongoose.Types.ObjectId;
   driverId?: mongoose.Types.ObjectId;
   pickupLocation: ILocation;
-  // pickupLocationGeo: IGeoPoint;
+  pickupLocationGeo: IGeoPoint;
   dropoffLocation: ILocation;
-  // dropupLocationGeo: IGeoPoint;
+  dropupLocationGeo: IGeoPoint;
   distance?: string;
   duration: string;
   people?: number;
@@ -20,7 +20,7 @@ export interface IRide extends Document {
   completedAt?: Date;
 }
 
-const RideSchema = new mongoose.Schema<IRide>({
+const TripSchema = new mongoose.Schema<ITrip>({
   riderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, indexes: true },
   driverId: { type: mongoose.Schema.Types.ObjectId, ref: "User", indexes: true },
   pickupLocation: {
@@ -37,10 +37,10 @@ const RideSchema = new mongoose.Schema<IRide>({
   duration: String,
   price: Number,
   people: {type: Number},
-  status: { type: String, enum:["requested", "ontrip", "cancelled", "completed", "accepted"], default: "requested" },
+  status: { type: String, enum:["requested", "ontrip", "cancelled", "completed", "accepted", "pickedup", "rejected"], default: "requested" },
   paymentStatus: { type: String, default: "pending" },
   startedAt: {type: Date, default: new Date},
   completedAt: Date,
 }, { timestamps: true });
 
-export default mongoose.model<IRide>("Ride", RideSchema);
+export default mongoose.model<ITrip>("Trip", TripSchema);

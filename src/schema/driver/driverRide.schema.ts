@@ -17,7 +17,7 @@ export interface IDriverRide extends Document {
   // 🔹 Old structure (keep for UI & compatibility)
   currentLocation: ILocation;
   // 🔥 NEW (for geo queries)
-  currentLocationGeo: IGeoPoint;
+  currentLocationGeo?: IGeoPoint;
   destination?: ILocation;
   destinationLocationGeo: IGeoPoint;
   routeGeo: IGeoLineString;
@@ -54,7 +54,7 @@ const DriverRideSchema = new Schema<IDriverRide>(
     currentLocationGeo: {
       type: GeoPointSchema,
       required: true,
-      index: "2dsphere",
+      // index: "2dsphere",
     },
 
     destination: {
@@ -64,7 +64,7 @@ const DriverRideSchema = new Schema<IDriverRide>(
     destinationLocationGeo: {
       type: GeoPointSchema,
       required: true,
-      index: "2dsphere",
+      // index: "2dsphere",
     },
 
     // ✅ Update routeGeo to be proper LineString GeoJSON

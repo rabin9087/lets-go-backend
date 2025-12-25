@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import { getADriverByRegoPhone, getDriversByPickUpAndDropoffLocation, getDriversByPickupLocation } from "../schema/driver/driverRide.models";
-import { getARideById, insertNewRide, updateRideAcceptedStatus, updateRideStatus } from "../schema/rider/ride.models";
-import { IRide } from "../schema/rider/ride.schema";
+import { getADriverByRegoPhone, getDriversByPickUpAndDropoffLocation, getDriversByPickupLocation, updateDriverTripStatus } from "../schema/driver/driverRide.models";
 import { getIO } from "../utils/socket.io";
+import { ITrip } from "../schema/trip/trip.schema";
+import { getATripById, insertNewTrip, updateTripAcceptedStatus, updateTripStatus } from "../schema/trip/trip.models";
+import { addNewTripToUser } from "../schema/users/user.model";
+import mongoose from "mongoose";
 
-export const createNewRideByPickupAnddrpoffLocationController = async (
+export const createNewTripByPickupAnddrpoffLocationController = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -15,81 +17,74 @@ export const createNewRideByPickupAnddrpoffLocationController = async (
       pickupLocation,
       dropoffLocation,
       people,
-        price,
-      distance, 
+      price,
+      distance,
       duration,
     } = req.body;
 
-      // 1. get nearby drivers (200m radius)
-      const availableDrivers = await getDriversByPickUpAndDropoffLocation({
-        pickupLocation: pickupLocation.coords,
-        dropoffLocation: dropoffLocation.coords,
-        people,
-       
-    //   polyline,
-    });
 
+    const payload: Partial<ITrip> = {
+      riderId,
+      pickupLocation: {
+        address: pickupLocation.address || "",
+        coords:
+        {
+          latitude: pickupLocation.coords.latitude,
+          longitude: pickupLocation.coords.longitude
+        },
+      },
+      dropoffLocation: {
+        address: dropoffLocation.address || "",
+        coords: {
+          latitude: dropoffLocation.coords.latitude,
+          longitude: dropoffLocation.coords.longitude
+        },
+      },
+      people,
+      price,
+      distance,
+      duration
+      // paymentStatus,
+    };
+
+
+    // 3. create new trip
+    const newTrip = await insertNewTrip(payload);
+
+    // 1. get nearby drivers (200m radius)
+    const availableDrivers = await getDriversByPickUpAndDropoffLocation({
+      pickupLocation: pickupLocation.coords,
+      dropoffLocation: dropoffLocation.coords,
+      people,
+
+      //   polyline,
+    });
 
     if (!availableDrivers.length) {
       return res.status(404).json({
         status: "error",
-          message: "No drivers available within 200m radius.",
-        data: {drivers: []}
+        message: "No drivers available within 200m radius.",
+        data: { drivers: [] }
       });
     }
 
-    // 2. select the best first driver
     const bestDriver = availableDrivers[0];
 
-    if (bestDriver.socketId) {
-       const io = getIO();
-      io.to(bestDriver.socketId).emit("ride-request", {
-      _id: bestDriver?._id,
-      riderId,
-      pickupLocation,
-      dropoffLocation,
-        people,
-        price,
-        distance, 
-        duration
-    });
-}
-      
-const payload: Partial<IRide> = {
-    riderId,
-    driverId: bestDriver._id,
-    pickupLocation: {
-        address: pickupLocation.address || "",
-        coords: 
-             { 
-                latitude: pickupLocation.coords.latitude, 
-                longitude: pickupLocation.coords.longitude 
-              },
-    },
-    dropoffLocation: {
-        address: dropoffLocation.address || "",
-        coords:  { 
-                latitude: pickupLocation.coords.latitude, 
-                longitude: pickupLocation.coords.longitude 
-              },
-    },
-        price,
-        distance, 
-        duration
-    // paymentStatus,
-};
+    if (newTrip?._id && bestDriver?.socketId) {
+      const io = getIO();
 
-// 3. create new ride
-const newRide = await insertNewRide(payload);
+      io.to(bestDriver.socketId).emit("trip:incoming", {
+        newTrip,
+        expiresIn: 45,
+      });
+    }
 
-    // 4. send realtime request to driver (socket push)
-    
-    // socket.to(bestDriver._id.toString()).emit("incoming-ride-request", newRide);
+    // socket.to(bestDriver._id.toString()).emit("incoming-trip-request", newtrip);
 
-    return res.status(201).json({
+    return res.status(200).json({
       status: "success",
-      message: "Ride request sent to best driver",
-      data: newRide,
+      message: "Trip request sent to best driver",
+      data: {newTrip},
     });
 
   } catch (error) {
@@ -97,7 +92,7 @@ const newRide = await insertNewRide(payload);
   }
 };
 
-export const createNewRideByPickupLocationController = async (
+export const createNewtripByPickupLocationController = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -107,66 +102,66 @@ export const createNewRideByPickupLocationController = async (
       pickupLocation,
       dropoffLocation,
       riderId,
-    //   distance,
-    //   price,
-    //     status,
-    //   paymentStatus,
+      //   distance,
+      //   price,
+      //     status,
+      //   paymentStatus,
     } = req.body;
 
     console.log(req.body)
-      // 1. get nearby drivers (200m radius)
-      const availableDrivers = await getDriversByPickupLocation({
-        pickupLocation: pickupLocation.coords,
-    //   polyline,
+    // 1. get nearby drivers (200m radius)
+    const availableDrivers = await getDriversByPickupLocation({
+      pickupLocation: pickupLocation.coords,
+      //   polyline,
     });
 
 
     if (!availableDrivers.length) {
       return res.status(404).json({
         status: "error",
-          message: "No drivers available within 200m radius.",
-        data: {drivers: []}
+        message: "No drivers available within 200m radius.",
+        data: { drivers: [] }
       });
     }
 
     console.log("availableDrivers", availableDrivers)
     // 2. select the best first driver
-      const bestDriver = availableDrivers[0];
-      
-const payload: Partial<IRide> = {
-    riderId,
-    driverId: bestDriver._id,
-    pickupLocation: {
-        address: pickupLocation.address || "",
-        coords: 
-             { 
-                latitude: pickupLocation.coords.latitude, 
-                longitude: pickupLocation.coords.longitude 
-              },
-    },
-    dropoffLocation: {
-        address: dropoffLocation.address || "",
-        coords:  { 
-                latitude: dropoffLocation.coords.latitude, 
-                longitude: dropoffLocation.coords.longitude 
-              },
-    },
-    // distance,
-    // price,
-    // status,
-    // paymentStatus,
-};
+    const bestDriver = availableDrivers[0];
 
-// 3. create new ride
-const newRide = await insertNewRide(payload);
+    const payload: Partial<ITrip> = {
+      riderId,
+      driverId: bestDriver._id,
+      pickupLocation: {
+        address: pickupLocation.address || "",
+        coords:
+        {
+          latitude: pickupLocation.coords.latitude,
+          longitude: pickupLocation.coords.longitude
+        },
+      },
+      dropoffLocation: {
+        address: dropoffLocation.address || "",
+        coords: {
+          latitude: dropoffLocation.coords.latitude,
+          longitude: dropoffLocation.coords.longitude
+        },
+      },
+      // distance,
+      // price,
+      // status,
+      // paymentStatus,
+    };
+
+    // 3. create new trip
+    const newtrip = await insertNewTrip(payload);
 
     // 4. send realtime request to driver (socket push)
-    // socket.to(bestDriver._id.toString()).emit("incoming-ride-request", newRide);
+    // socket.to(bestDriver._id.toString()).emit("incoming-trip-request", newtrip);
 
     return res.status(201).json({
       status: "success",
-      message: "Ride request sent to best driver",
-      data: newRide,
+      message: "trip request sent to best driver",
+      data: newtrip,
     });
 
   } catch (error) {
@@ -174,103 +169,135 @@ const newRide = await insertNewRide(payload);
   }
 };
 
-export const getDriverByRegoPhoneController = async(req: Request,
+export const getDriverByRegoPhoneController = async (req: Request,
   res: Response,
   next: NextFunction) => {
-    try {
-        const {regoPhone} = req.body 
-        const driver = await getADriverByRegoPhone(regoPhone)
-        if (driver?.isOnline) {
-            //send a rider request notification to the driver 
+  try {
+    const { regoPhone } = req.body
+    const driver = await getADriverByRegoPhone(regoPhone)
+    if (driver?.isOnline) {
+      //send a tripr request notification to the driver 
 
-            return res.status(200).json({
-            status: "success",
-            message: "Your requested driver found",
-            data: driver
-            
-        })
-        } else {
-            // send notification to the driver to go online, request 
+      return res.status(200).json({
+        status: "success",
+        message: "Your requested driver found",
+        data: driver
 
-        }
+      })
+    } else {
+      // send notification to the driver to go online, request 
 
-        return res.status(200).json({
-            status: "error",
-            message: "Your requested driver is Offline",
-            
-        })
-    } catch (error) {
-        next(error)
     }
+
+    return res.status(200).json({
+      status: "error",
+      message: "Your requested driver is Offline",
+
+    })
+  } catch (error) {
+    next(error)
+  }
 }
 
-export const rideResponseController = async (
+export const tripResponseController = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { rideId, status, driverId } = req.body; // include driverId if needed
-
-    if (!rideId || !status) {
-      return res.status(400).json({ status: "error", message: "rideId and status are required" });
+    const { _id, status, driverId } = req.body; // include driverId if needed
+    if (!_id || !status) {
+      return res.status(400).json({ status: "error", message: "_id and status are required" });
     }
 
-    const ride = await getARideById(rideId);
+    const trip = await getATripById(_id);
 
-    if (!ride) {
+    if (!trip) {
       return res.status(404).json({ status: "error", message: "Ride not found" });
     }
 
-    const io = getIO(); // get your socket.io instance
+    const io = getIO();
+    if (driverId) {
+      if (status === "accepted") {
+        // Update ride status in DB
+        await addNewTripToUser({ _id: driverId, currentTrip: _id }) // Insert trip to Driver
+        await addNewTripToUser({ _id: trip.riderId, currentTrip: _id }) // Insert Trip to rider
+        const updatedTrip = await updateTripAcceptedStatus({ _id, driverId }); // create this function in your model
+        await updateDriverTripStatus({ driverId, status: "ontrip", seats: updatedTrip?._id ? updatedTrip.people as number : 0 })
 
-    if (status === "accepted") {
-      // Update ride status in DB
-      const updatedRide = await updateRideAcceptedStatus({rideId, driverId}); // create this function in your model
+        // Notify rider
+        io.to(`user_${trip.riderId}`).emit("trip:accepted", {
+          tripId: _id,
+          driverId,
+        });
 
-      // Notify rider in real-time
-      io.to(ride.riderId.toString()).emit("ride-accepted", updatedRide);
+        // Notify driver
+        io.to(`user_${driverId}`).emit("trip:accepted", {
+          tripId: _id,
+          riderId: trip.riderId,
+        });
 
-      return res.status(200).json({
-        status: "success",
-        message: "Ride accepted",
-        data: updatedRide,
-      });
-    }
+        return res.status(200).json({
+          status: "success",
+          message: "Ride accepted",
+          data: updatedTrip,
+        });
+      }
 
-    if (status === "rejected") {
-      // Update ride status in DB
-      const updatedRide = await updateRideStatus(rideId, "rejected");
+      if (status === "rejected") {
+        // Update ride status in DB
+        const updatedTrip = await updateTripStatus({ _id, status: "rejected" });
 
-      // Optionally, notify rider that the ride was rejected
-      io.to(ride.riderId.toString()).emit("ride-rejected", updatedRide);
+        // Optionally, notify rider that the ride was rejected
+        io.to(trip._id.toString()).emit("trip-rejected", updatedTrip);
 
-      // Optionally, find another available driver
-      const availableDrivers = await getDriversByPickUpAndDropoffLocation({
-        pickupLocation: ride.pickupLocation.coords,
-        dropoffLocation: ride.dropoffLocation.coords,
-        people: ride.people as number
-      });
+        // Optionally, find another available driver
+        const availableDrivers = await getDriversByPickUpAndDropoffLocation({
+          pickupLocation: trip.pickupLocation.coords,
+          dropoffLocation: trip.dropoffLocation.coords,
+          people: trip.people as number
+        });
 
-      if (availableDrivers.length) {
-        const nextDriver = availableDrivers[0];
-        if (nextDriver.socketId) {
-          io.to(nextDriver.socketId).emit("ride-request", {
-            _id: nextDriver._id,
-            riderId: ride.riderId,
-            pickupLocation: ride.pickupLocation,
-            dropoffLocation: ride.dropoffLocation,
-            people: ride.people,
+        if (availableDrivers.length) {
+          const nextDriver = availableDrivers[0];
+          if (nextDriver.socketId) {
+            io.to(nextDriver.socketId).emit("trip-request", {
+              _id: nextDriver._id,
+              riderId: trip.riderId,
+              pickupLocation: trip.pickupLocation,
+              dropoffLocation: trip.dropoffLocation,
+              people: trip.people,
+            });
+          }
+        }
+
+        return res.status(200).json({
+          status: "success",
+          message: "Ride rejected",
+          data: updatedTrip,
+        });
+      }
+
+
+      if (status! == "accepted" || status !== "rejected") {
+
+        if (status === "completed") {
+          await addNewTripToUser({ _id: driverId, currentTrip: null })
+          await addNewTripToUser({ _id: trip?.riderId, currentTrip: null })
+        }
+
+        await updateDriverTripStatus({ driverId, status: status === "completed" ? "online" : status, seats: 0 });
+        const updatedTrip = await updateTripStatus({ _id, status });
+        if (updatedTrip?._id) {
+          return res.status(200).json({
+            status: "success",
+            message: "Ride rejected",
+            data: updatedTrip,
           });
         }
       }
-
-      return res.status(200).json({
-        status: "success",
-        message: "Ride rejected",
-        data: updatedRide,
-      });
     }
+
 
     return res.status(400).json({
       status: "error",
