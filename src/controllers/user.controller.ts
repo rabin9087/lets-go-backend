@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { createUser, getUserByPhoneAndJWT, getUserByPhoneOrEmail, signOutUserByPhoneANDJWT, updateDriverOnlineStatus } from "../schema/users/user.model";
-import { IUser } from "../schema/users/user.schema";
+import userSchema, { IUser } from "../schema/users/user.schema";
 import { hashPassword, validatePassword } from "../utils/bcrypt";
 import { createAccessJWT, createRefreshJWT, verifyRefreshJWT } from "../utils/jwt";
 
@@ -9,9 +9,16 @@ export const createUserController = async (
   res: Response,
   next: NextFunction
 ) => {
-    try {
-  
-    const { password } = req.body;
+  try {
+
+   const {name, email, phone,password, role, status, vehicleRego, licenceNumber, vehicleType} = req.body
+    // Validate required fields
+    if (!name || !phone) {
+      return res.status(400).json({
+        status: "error",
+        message: "Name and phone are required.",
+      });
+    }
 
     if (!password) {
       return res.status(400).json({
@@ -19,39 +26,60 @@ export const createUserController = async (
         message: "Password is required.",
       });
     }
+
     // Hash password
-    req.body.password = hashPassword(password);
+    const hashedPassword = hashPassword(password);
 
-    // Create user in DB
-    const newUser: IUser = await createUser(req.body);
+    // Build user object dynamically
+    const newUserObj: Partial<IUser> = {
+      name,
+      email,
+      phone,
+      password: hashedPassword,
+      role: role as IUser["role"],
+      status: status as IUser["status"],
+    };
 
-    // Do not expose password
-    // @ts-ignore
-    newUser.password = undefined;
-
-    if (!newUser?._id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Failed to create user.",
-      });
+    // Optional driver fields
+    if (role === "driver") {
+      newUserObj.driverProfile = {
+        vehicle: {
+          rego: vehicleRego,
+          model: vehicleType?.model,
+          color: vehicleType?.color,
+          year: vehicleType?.year,
+          photos: vehicleType?.photos || [],
+        },
+      };
     }
 
-    // Generate access token
-    // const token = await createAccessJWT(newUser.email as string);
+    // Create user in DB
+    const newUser: IUser = await createUser(newUserObj);
+
+    // Remove sensitive info
+    newUser.password = undefined;
 
     return res.status(201).json({
       status: "success",
-      message: "User created. Please check your email to verify your account.",
+      message: "User created successfully. Please check your email to verify your account.",
       data: newUser,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle duplicate key error (email/phone)
+    if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyValue)[0];
+      return res.status(400).json({
+        status: "error",
+        message: `${duplicateField} already exists.`,
+      });
+    }
     return next(error);
   }
 };
 
 export const loginUser = async (
   req: Request,
-  res: Response, 
+  res: Response,
   next: NextFunction
 ) => {
   try {
@@ -66,19 +94,20 @@ export const loginUser = async (
 
     // Verify the password of the user with the one sent in the request body
     const isValidPassword = validatePassword(password, userDoc.password as string);
-      if (!isValidPassword) {
+    if (!isValidPassword) {
       return res
         .status(401)
-        .send({ status: "error", message: "Wrong password." });}
+        .send({ status: "error", message: "Wrong password." });
+    }
 
-        const user = userDoc.toObject() as IUser;
+    const user = userDoc.toObject() as IUser;
 
-      // If everything goes well, send the token to the client
-      const payload = {
-          phone: user?.phone,
-          email: user?.email as string,
-          role: user?.role as string
-        }
+    // If everything goes well, send the token to the client
+    const payload = {
+      phone: user?.phone,
+      email: user?.email as string,
+      role: user?.role as string
+    }
     const accessJWT = await createAccessJWT(payload);
     const refreshJWT = await createRefreshJWT(payload);
     // todo send jwt tokens to the user
@@ -87,7 +116,7 @@ export const loginUser = async (
     delete user.refreshJWT;
     if (user.role === "rider") delete user.driverProfile;
     if (user.role === "driver") delete user.riderProfile;
-          
+
     return res.json({
       status: "success",
       message: `Welcome back ${user.name} !`,
@@ -96,20 +125,19 @@ export const loginUser = async (
         tokens: {
           accessJWT,
           refreshJWT,
-          },
+        },
       }
     });
 
   } catch (error) {
     console.log("Server Error from here ")
-
     next(error);
   }
 };
 
 export const logoutUser = async (
   req: Request,
-  res: Response, 
+  res: Response,
   next: NextFunction
 ) => {
   try {
@@ -165,4 +193,72 @@ export const logoutUser = async (
     next(error);
   }
 };
-  
+
+
+export const addAddressController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { address, coords, label } = req.body;
+console.log(address, coords, label)
+    if (!address || !coords?.latitude || !coords?.longitude || !label) {
+      return res.status(400).json({
+        status: "error",
+        message: "Label, address, and coordinates are required",
+      });
+    }
+
+    const updatedUser = await userSchema.findByIdAndUpdate(
+      req.userInfo?._id,
+      {
+        $push: {
+          savedLocations: {
+            label,
+            coordinates: {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            },
+            address
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Address added successfully",
+      data: updatedUser.savedLocations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const registerPushNotificationToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => { 
+  const { pushToken } = req.body;
+  if (!req.userInfo?._id || !pushToken) {
+    return res.status(400).json({ message: 'Missing data' });
+  }
+
+  try {
+    await userSchema.findByIdAndUpdate(req.userInfo?._id , { pushToken }, { new: true });
+    res.json({ status: 'success', message: 'Token stored' });
+  } catch (err) {
+    console.error(err);
+   next(err)
+  }
+}

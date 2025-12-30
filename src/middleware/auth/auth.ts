@@ -11,7 +11,6 @@ type UserWithoutSensitiveData = Omit<IUser, 'password' | 'refreshJWT'>;
 
 export const auth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-     // 1. Get access JWT token from the frontend
     const { authorization } = req.headers;
     if (!authorization) {
       return res.status(401).json({
@@ -23,38 +22,54 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     // Extract token from "Bearer <token>" format
     const token = authorization.startsWith("Bearer ") ? authorization.split(" ")[1] : authorization;
 
-    const decoded = verifyAccessJWT(token as string);
-    //decoded have three properties one of them being user phone expiry data
-    // extrat phone and get get user by email
-    if (decoded?.phone) {
-      // check if the user is active
-      const user = await getUserByPhoneOrEmail(decoded.phone);
-      if (user?._id) {
-        // user.refreshJWT = undefined;
-        user.password = undefined;
-          user.refreshJWT = undefined;
-        //   user?.driverProfile?.bankDetails = undefined
-        req.userInfo = user as IUser;
-        return next();
+    let decoded = verifyAccessJWT(token);
+
+    // If access token is invalid or expired, try refresh token
+    if (!decoded) {
+      decoded = verifyRefreshJWT(token);
+      if (!decoded) {
+        return res.status(401).json({
+          status: "error",
+          message: "Invalid token. Please login again.",
+        });
       }
+    }
+
+    // If decoded contains phone, fetch user
+    if (decoded?.phone) {
+      const user = await getUserByPhoneOrEmail(decoded.phone);
+      if (!user?._id) {
+        return res.status(404).json({
+          status: "error",
+          message: "User not found",
+        });
+      }
+
+      // Hide sensitive info
+      user.password = undefined;
+      user.refreshJWT = undefined;
+
+      req.userInfo = user as IUser;
+      return next();
     }
 
     res.status(401).json({
       status: "error",
       message: "Unauthorized access",
     });
-  } catch (error: CustomError | any) {
+  } catch (error: any) {
     if (error.message.includes("jwt expired")) {
       error.statusCode = 403;
-      error.message = "Your token has expired. Please login Again";
+      error.message = "Your token has expired. Please login again.";
     }
     if (error.message.includes("invalid signature")) {
       error.statusCode = 401;
-      error.message = error.message;
+      error.message = "Invalid token signature";
     }
     next(error);
   }
 };
+
 
 export const newAdminSignUpAuth = async (
   req: Request,
@@ -381,8 +396,6 @@ export const refreshAuth = async (req: Request, res: Response, next: NextFunctio
         if (user?.role === "driver") {
             driver = await getADriverByDriverId(user._id)
         }
-
-       
         
         return res.json({
           status: "success",

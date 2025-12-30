@@ -25,9 +25,10 @@ export interface IUser extends Document {
     bankDetails?: any;
     identityDocs?: any;
   };
+  savedLocations?: { label: string; coordinates: ICoordinates }[];
   currentTrip: mongoose.Types.ObjectId | null;
   trips: mongoose.Types.ObjectId[];
-
+  pushToken: string
 }
 
 const UserSchema = new mongoose.Schema<IUser>({
@@ -42,7 +43,7 @@ const UserSchema = new mongoose.Schema<IUser>({
   riderProfile: {
     rating: { type: Number, default: 5 },
     totalTrips: { type: Number, default: 0 },
-    savedLocations: [{ label: String, coordinates: {latitude: Number, longitude: Number} }],
+    savedLocations: [{ label: String, coordinates: {latitude: Number, longitude: Number}, address: String }],
   },
   driverProfile: {
     isOnline: { type: Boolean, default: false },
@@ -67,7 +68,17 @@ const UserSchema = new mongoose.Schema<IUser>({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Trip",
     default: null,
-},
+  },
+  savedLocations: [
+    {
+      label: { type: String, },
+      coordinates: {
+        latitude: { type: Number,  },
+        longitude: { type: Number, },
+      },
+      address: { type: String, },
+    },
+  ],
 
   trips: [
       {
@@ -75,6 +86,7 @@ const UserSchema = new mongoose.Schema<IUser>({
           ref: "Trip",
       }
   ],
+  pushToken: {type: String, index: true}
 }, { timestamps: true });
 
 export default mongoose.model<IUser>("User", UserSchema);

@@ -23,7 +23,7 @@ export const getDriversByPickUpAndDropoffLocation = async ({
   dropoffLocation,
  people
 }: {
-  pickupLocation: ICoordinates;
+    pickupLocation: ICoordinates;
     dropoffLocation: ICoordinates;
     people: number;
 
@@ -68,12 +68,21 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
 }
 
 
-export const updateOnlineDriverSocketId = ({driverId, socketId}: {driverId: string, socketId: string}) => {
-  return driverRideSchema.findOneAndUpdate({driverId, socketId})
-}
+// export const updateOnlineDriverSocketId = ({driverId, socketId}: {driverId: string, socketId: string}) => {
+//   return driverRideSchema.findOneAndUpdate({driverId, socketId})
+// }
 
 export const getADriverByRegoPhone = (regoPhone: string) => {
-  return driverRideSchema.findOne({$or: [{ "vehicle.rego": regoPhone }, { phone: regoPhone }]})
+  if (!regoPhone) return null;
+
+  const value = regoPhone.trim().toUpperCase();
+
+  return driverRideSchema.findOne({
+    $or: [
+      { "vehicle.rego": value },
+      { phone: value },
+    ],
+  }).exec(); // or .lean() if you don’t need mongoose methods
 }
 
 export const getDriversByPickupLocation = async ({
@@ -109,6 +118,7 @@ export const findAndUpdateDriverRideOnlineStatus = async ({
   rego,
   seatAvailable,
   routeGeo,
+  phone
 }: {
   driverId: mongoose.Types.ObjectId;
   isOnline: boolean;
@@ -117,13 +127,15 @@ export const findAndUpdateDriverRideOnlineStatus = async ({
   destination?: ILocation;
   rego?: string;
   seatAvailable?: number;
-  routeGeo?: ICoordinates[];
+    routeGeo?: ICoordinates[];
+  phone: string
 }) => {
   const update: any = {
     driverId,
     isOnline,
     status,
     seatAvailable,
+    phone
     // socketId: driverId.toString()
   };
   if (rego) update.vehicle = { rego };

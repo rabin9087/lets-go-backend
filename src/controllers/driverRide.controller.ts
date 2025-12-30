@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { createNewDriverRide, findAndUpdateDriverRideOnlineStatus, getAllDrivers } from "../schema/driver/driverRide.models";
 import { getUserByPhoneOrEmail, updateDriverOnlineStatus } from "../schema/users/user.model";
+import { findMatchingTripsForDriver } from "../schema/trip/trip.models";
+import { getIO } from "../utils/socket.io";
 
 export const updateDriverOnlineStatusController = async (
   req: Request,
@@ -9,7 +11,6 @@ export const updateDriverOnlineStatusController = async (
 ) => {
   try {
     const { email_phone, onlineStatus, currentLocation, destination, rego, seatAvailable, routeGeo } = req.body;
-
     if (onlineStatus === undefined) {
       return res.status(400).json({
         status: "error",
@@ -41,11 +42,11 @@ export const updateDriverOnlineStatusController = async (
       });
     }
 
-    // ✅ Update driver profile online status
+    // ✅ Update driver profile online status on user schema
     await updateDriverOnlineStatus(user.phone, onlineStatus);
 
     // ✅ Update or create driver ride
-      const ride = await findAndUpdateDriverRideOnlineStatus({
+      const updateDriver = await findAndUpdateDriverRideOnlineStatus({
       driverId: user._id,
       isOnline: onlineStatus,
       status: onlineStatus ? "online" : "offline",
@@ -53,21 +54,32 @@ export const updateDriverOnlineStatusController = async (
       destination,
       rego,
       seatAvailable,
-        routeGeo
-    });
-
+      routeGeo,
+      phone: user?.phone
+      });
+    
+    const newTrip = await findMatchingTripsForDriver(user?._id)
+    console.log("New Trip", newTrip)
+    
+    if (newTrip) {
+      getIO().to(`user_${user?._id}`).emit("trip:incoming", {
+            newTrip,
+            expiresIn: 45,
+          });
+        }
+   
     return res.status(200).json({
       status: "success",
       message: `Driver is ${onlineStatus ? "Online" : "Offline"}`,
       data: {
         onlineStatus,
-        ride,
+        updateDriver,
       },
     });
   } catch (error) {
     next(error);
   }
-};
+}
 
 export const updateDriverCurrentLocationController = async (
   req: Request,
@@ -75,7 +87,7 @@ export const updateDriverCurrentLocationController = async (
   next: NextFunction
 ) => {
   try {
-    const { email_phone, onlineStatus, currentLocation, destination, routeGeo, rego, seatAvailable  } = req.body;
+    const { email_phone, onlineStatus, currentLocation, destination, routeGeo, rego, seatAvailable, regoPhone  } = req.body;
 
     if (!email_phone || onlineStatus === undefined) {
       return res.status(400).json({
@@ -117,7 +129,7 @@ export const updateDriverCurrentLocationController = async (
       onlineStatus
       );
  
-    const driver =  await findAndUpdateDriverRideOnlineStatus({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline", seatAvailable, routeGeo})
+    const driver =  await findAndUpdateDriverRideOnlineStatus({driverId: user?._id, isOnline: onlineStatus, status: onlineStatus ? "online" : "offline", seatAvailable, routeGeo, phone: regoPhone})
 
     return res.status(200).json({
       status: "success",

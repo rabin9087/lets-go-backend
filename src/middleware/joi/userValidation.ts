@@ -13,6 +13,9 @@ export const signupValidation = (
         password: PHONEREQUIRED,
         role: SORTSTRREQUIRED,
         status: SORTSTRREQUIRED,
+        vehicleRego: SORTSTR.optional(),
+        licenceNumber: SORTSTR.optional(),
+        vehicleType: SORTSTR.optional(),
         address: SORTSTR.optional(),
         profileImage: LONGSTR.optional(),
         

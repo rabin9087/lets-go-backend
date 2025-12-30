@@ -1,5 +1,5 @@
 import mongoose, { Document } from "mongoose";
-import { ICoordinates, IGeoPoint, ILocation } from "../common schema/shareSchema.schema";
+import { CoordinatesSchema, GeoPointSchema, ICoordinates, IGeoPoint, ILocation } from "../common schema/shareSchema.schema";
 
 
 
@@ -9,7 +9,7 @@ export interface ITrip extends Document {
   pickupLocation: ILocation;
   pickupLocationGeo: IGeoPoint;
   dropoffLocation: ILocation;
-  dropupLocationGeo: IGeoPoint;
+  dropoffLocationGeo: IGeoPoint;
   distance?: string;
   duration: string;
   people?: number;
@@ -24,15 +24,22 @@ const TripSchema = new mongoose.Schema<ITrip>({
   riderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, indexes: true },
   driverId: { type: mongoose.Schema.Types.ObjectId, ref: "User", indexes: true },
   pickupLocation: {
-    coords: {
-      latitude: { type: Number },
-      longitude: {type: Number}},
-      address: String
+    type: CoordinatesSchema,
+    required: true,
   },
-  dropoffLocation: { coords: {
-      latitude: { type: Number },
-      longitude: {type: Number}},
-      address: String },
+  pickupLocationGeo: {
+      type: GeoPointSchema,
+      required: true,
+},
+
+  dropoffLocation: {
+    type: CoordinatesSchema,
+    required: true
+  },
+  dropoffLocationGeo: {
+      type: GeoPointSchema,
+      required: true,
+},
   distance: String,
   duration: String,
   price: Number,
@@ -42,5 +49,9 @@ const TripSchema = new mongoose.Schema<ITrip>({
   startedAt: {type: Date, default: new Date},
   completedAt: Date,
 }, { timestamps: true });
+
+TripSchema.index({ pickupLocationGeo: "2dsphere" });
+TripSchema.index({ dropoffLocationGeo: "2dsphere" });
+
 
 export default mongoose.model<ITrip>("Trip", TripSchema);

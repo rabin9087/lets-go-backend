@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import userSchema, { IUser } from "./user.schema";
 
-export const createUser = (userObj: IUser) => {
-  return new userSchema(userObj).save();
+export const createUser = async (userObj: Partial<IUser>): Promise<IUser> => {
+  return new userSchema(userObj).save()
 };
 
 export const UpdateUserRefreshJWTByPhone = ({phone, refreshJWT}: {phone: string, refreshJWT: string}) => {
